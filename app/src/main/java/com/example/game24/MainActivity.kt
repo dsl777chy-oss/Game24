@@ -162,30 +162,65 @@ private fun Game24App() {
         state = if (solution == null) RoundState.NoSolutionCorrect else RoundState.LostWrongNoSolution(solution)
     }
 
-    Scaffold { padding ->
+    Scaffold(
+        topBar = {
+            Surface(shadowElevation = 2.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "24 点",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(onClick = { if (!locked) resetRound() }, enabled = !locked) {
+                        Text("换一题")
+                    }
+                }
+            }
+        },
+        bottomBar = {
+            Surface(shadowElevation = 8.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onClear() },
+                        enabled = !locked,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("清空") }
+
+                    OutlinedButton(
+                        onClick = { onNoSolution() },
+                        enabled = !locked,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("无解") }
+
+                    Button(
+                        onClick = { onCalculate() },
+                        enabled = !locked && slotsComplete && opsComplete,
+                        modifier = Modifier.weight(1f)
+                    ) { Text("计算") }
+                }
+            }
+        }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-
-            // 顶部：标题 + 换题（不占一大行空白）
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "24 点",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(onClick = { if (!locked) resetRound() }, enabled = !locked) {
-                    Text("换一题")
-                }
-            }
 
             // 数字池（可点选）
             NumbersChips(
@@ -245,31 +280,6 @@ private fun Game24App() {
                 onChange = { paren = it }
             )
 
-            // 底部按钮（不再用 Spacer(weight=1f) 撑出大空白）
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { onClear() },
-                    enabled = !locked,
-                    modifier = Modifier.weight(1f)
-                ) { Text("清空") }
-
-                OutlinedButton(
-                    onClick = { onNoSolution() },
-                    enabled = !locked,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.weight(1f)
-                ) { Text("无解") }
-
-                Button(
-                    onClick = { onCalculate() },
-                    enabled = !locked && slotsComplete && opsComplete,
-                    modifier = Modifier.weight(1f)
-                ) { Text("计算") }
-            }
-
             val statusText = when (hasSolution) {
                 null -> if (!slotsComplete) "请先放入四个数字，再判断是否有解。" else "请选择三个运算符后再判断是否有解。"
                 true -> "当前组合有解。"
@@ -293,7 +303,7 @@ private fun Game24App() {
                 )
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             Text(
                 "提示：运算符按钮点开后选择 + − × ÷，括号只允许一对相邻。",
                 style = MaterialTheme.typography.bodySmall,
@@ -385,7 +395,7 @@ private fun NumbersChips(
         Spacer(Modifier.weight(1f))
         Text(
             "目标 = 24",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.titleSmall,
             fontWeight = FontWeight.SemiBold,
             textAlign = TextAlign.End,
             modifier = Modifier.widthIn(min = 72.dp)
@@ -466,7 +476,7 @@ private fun ExpressionPanel(
 
         Text(
             "= 24",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.End,
             modifier = Modifier.align(Alignment.CenterEnd)
