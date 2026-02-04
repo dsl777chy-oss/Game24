@@ -1,6 +1,7 @@
 package com.example.game24
 
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -46,6 +47,8 @@ class MainActivity : ComponentActivity() {
 private enum class ParenMode(val label: String) { NONE("无"), AB("(1-2)"), BC("(2-3)"), CD("(3-4)") }
 private enum class Op(val label: String) { ADD("+"), SUB("−"), MUL("×"), DIV("÷") }
 
+private const val DEBUG_TAG = "Game24"
+
 private sealed class Tok {
     data class Num(val v: Frac) : Tok()
     data class Oper(val op: Op) : Tok()
@@ -60,8 +63,6 @@ private sealed class RoundState {
     data class LostWrongNoSolution(val solution: String) : RoundState()
 }
 
-private data class VerifyResult(val hasSolution: Boolean, val oneSolutionExpr: String?)
-
 @Composable
 private fun Game24App() {
     var nums by remember { mutableStateOf(random4()) }
@@ -70,6 +71,28 @@ private fun Game24App() {
     var state by remember { mutableStateOf<RoundState>(RoundState.Playing) }
 
     val locked = state !is RoundState.Playing
+    val opsComplete = ops.all { it != null }
+    val hasSolution by remember(nums, ops, paren) {
+        derivedStateOf {
+            if (!opsComplete) {
+                null
+            } else {
+                evalExact(nums, ops.filterNotNull(), paren) == Frac(24, 1)
+            }
+        }
+    }
+
+    LaunchedEffect(nums, ops, paren, hasSolution) {
+        if (BuildConfig.DEBUG) {
+            val opsSelected = ops.filterNotNull()
+            val tokens = if (opsComplete) buildTokens(nums, opsSelected, paren) else emptyList()
+            val tokenText = if (opsComplete) tokensToString(tokens) else "incomplete"
+            Log.d(
+                DEBUG_TAG,
+                "nums=$nums ops=$ops paren=$paren tokens=$tokenText hasSolution=$hasSolution"
+            )
+        }
+    }
 
     fun resetRound() {
         nums = random4()
@@ -82,6 +105,7 @@ private fun Game24App() {
         if (locked) return
         ops = listOf(null, null, null)
         paren = ParenMode.NONE
+        state = RoundState.Playing
     }
 
     fun onCalculate() {
@@ -98,9 +122,11 @@ private fun Game24App() {
 
     fun onNoSolution() {
         if (locked) return
-        val r = verifyHasSolutionByYourRule(nums)
-        state = if (r.hasSolution) {
-            RoundState.LostWrongNoSolution(r.oneSolutionExpr ?: "（找到解但表达式生成失败）")
+        if (!opsComplete) return
+        val chosen = ops.filterNotNull()
+        val result = evalExact(nums, chosen, paren)
+        state = if (result == Frac(24, 1)) {
+            RoundState.LostWrongNoSolution(formatExpr(nums, chosen, paren))
         } else {
             RoundState.NoSolutionCorrect
         }
@@ -170,10 +196,26 @@ private fun Game24App() {
 
                 Button(
                     onClick = { onCalculate() },
-                    enabled = !locked && ops.all { it != null },
+                    enabled = !locked && opsComplete,
                     modifier = Modifier.weight(1f)
                 ) { Text("计算") }
             }
+
+            val statusText = when (hasSolution) {
+                null -> "请选择三个运算符后再判断是否有解。"
+                true -> "当前组合有解。"
+                false -> "当前组合无解。"
+            }
+            val statusColor = when (hasSolution) {
+                false -> MaterialTheme.colorScheme.error
+                true -> MaterialTheme.colorScheme.primary
+                null -> MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            Text(
+                statusText,
+                style = MaterialTheme.typography.bodySmall,
+                color = statusColor
+            )
 
             Spacer(Modifier.height(6.dp))
             Text(
@@ -372,6 +414,9 @@ private fun ParenSlider(value: ParenMode, enabled: Boolean, onChange: (ParenMode
             ParenMode.CD -> 3f
         }
         var temp by remember { mutableStateOf(raw) }
+        LaunchedEffect(value) {
+            temp = raw
+        }
 
         Slider(
             value = temp,
@@ -444,21 +489,13 @@ private fun precedence(op: Op): Int = when (op) {
     Op.ADD, Op.SUB -> 1
 }
 
-/**
- * 正确求值：支持 ×÷ 优先级 + 一对括号（相邻）
- * tokens: a o1 b o2 c o3 d，括号只可能包住 (a o1 b)/(b o2 c)/(c o3 d)
- */
-private fun evalExact(nums: List<Int>, ops: List<Op>, paren: ParenMode): Frac? {
+private fun buildTokens(nums: List<Int>, ops: List<Op>, paren: ParenMode): List<Tok> {
     val a = Frac(nums[0], 1)
     val b = Frac(nums[1], 1)
     val c = Frac(nums[2], 1)
     val d = Frac(nums[3], 1)
-
-
-
     val (o1, o2, o3) = ops
-
-    val tokens: List<Tok> = when (paren) {
+    return when (paren) {
         ParenMode.NONE -> listOf(
             Tok.Num(a), Tok.Oper(o1), Tok.Num(b), Tok.Oper(o2), Tok.Num(c), Tok.Oper(o3), Tok.Num(d)
         )
@@ -472,6 +509,23 @@ private fun evalExact(nums: List<Int>, ops: List<Op>, paren: ParenMode): Frac? {
             Tok.Num(a), Tok.Oper(o1), Tok.Num(b), Tok.Oper(o2), Tok.L, Tok.Num(c), Tok.Oper(o3), Tok.Num(d), Tok.R
         )
     }
+}
+
+private fun tokensToString(tokens: List<Tok>): String = tokens.joinToString(" ") { tok ->
+    when (tok) {
+        Tok.L -> "("
+        Tok.R -> ")"
+        is Tok.Num -> tok.v.n.toString() + "/" + tok.v.d.toString()
+        is Tok.Oper -> tok.op.label
+    }
+}
+
+/**
+ * 正确求值：支持 ×÷ 优先级 + 一对括号（相邻）
+ * tokens: a o1 b o2 c o3 d，括号只可能包住 (a o1 b)/(b o2 c)/(c o3 d)
+ */
+private fun evalExact(nums: List<Int>, ops: List<Op>, paren: ParenMode): Frac? {
+    val tokens = buildTokens(nums, ops, paren)
 
     fun apply(x: Frac, op: Op, y: Frac): Frac? = when (op) {
         Op.ADD -> x + y
@@ -544,27 +598,6 @@ private fun formatExpr(nums: List<Int>, ops: List<Op>, paren: ParenMode): String
         ParenMode.BC -> "$a $o1 ($b $o2 $c) $o3 $d = 24"
         ParenMode.CD -> "$a $o1 $b $o2 ($c $o3 $d) = 24"
     }
-}
-
-/** 无解判定：严格按你的规则（固定顺序 + 一对相邻括号 + 3 运算符） */
-private fun verifyHasSolutionByYourRule(nums: List<Int>): VerifyResult {
-    val parens = listOf(ParenMode.NONE, ParenMode.AB, ParenMode.BC, ParenMode.CD)
-    val all = Op.values()
-
-    for (p in parens) {
-        for (o1 in all) {
-            for (o2 in all) {
-                for (o3 in all) {
-                    val ops = listOf(o1, o2, o3)
-                    val r = evalExact(nums, ops, p) ?: continue
-                    if (r == Frac(24, 1)) {
-                        return VerifyResult(true, formatExpr(nums, ops, p))
-                    }
-                }
-            }
-        }
-    }
-    return VerifyResult(false, null)
 }
 
 private fun random4(): List<Int> = (1..9).shuffled().take(4)
