@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +60,7 @@ private sealed class RoundState {
     data class Won(val expr: String) : RoundState()
     data object NoSolutionCorrect : RoundState()
     data class LostWrongNoSolution(val solution: String) : RoundState()
+    data class Info(val message: String) : RoundState()
 }
 
 @Composable
@@ -69,6 +69,7 @@ private fun Game24App() {
     var ops by remember { mutableStateOf(listOf<Op?>(null, null, null)) }
     var paren by remember { mutableStateOf(ParenMode.NONE) }
     var state by remember { mutableStateOf<RoundState>(RoundState.Playing) }
+    var actionMessage by remember { mutableStateOf<String?>(null) }
 
     val locked = state !is RoundState.Playing
     val opsComplete = ops.all { it != null }
@@ -99,36 +100,47 @@ private fun Game24App() {
         ops = listOf(null, null, null)
         paren = ParenMode.NONE
         state = RoundState.Playing
+        actionMessage = null
     }
 
     fun onClear() {
         if (locked) return
-        ops = listOf(null, null, null)
-        paren = ParenMode.NONE
-        state = RoundState.Playing
+        val alreadyClear = ops.all { it == null } && paren == ParenMode.NONE
+        if (alreadyClear) {
+            actionMessage = "当前已是空白。"
+        } else {
+            ops = listOf(null, null, null)
+            paren = ParenMode.NONE
+            state = RoundState.Playing
+            actionMessage = "已清空。"
+        }
     }
 
     fun onCalculate() {
         if (locked) return
-        if (ops.any { it == null }) return
+        if (ops.any { it == null }) {
+            actionMessage = "请先选满三个运算符。"
+            return
+        }
         val chosen = ops.filterNotNull()
         val result = evalExact(nums, chosen, paren) ?: return
         if (result == Frac(24, 1)) {
             state = RoundState.Won(formatExpr(nums, chosen, paren))
+            actionMessage = null
         } else {
             // 按你规则：算错不算输，不提示，继续改
+            actionMessage = "结果不是 24，可继续调整。"
         }
     }
 
     fun onNoSolution() {
         if (locked) return
-        if (!opsComplete) return
-        val chosen = ops.filterNotNull()
-        val result = evalExact(nums, chosen, paren)
-        state = if (result == Frac(24, 1)) {
-            RoundState.LostWrongNoSolution(formatExpr(nums, chosen, paren))
-        } else {
+        actionMessage = null
+        val solution = findAnySolution(nums, paren)
+        state = if (solution == null) {
             RoundState.NoSolutionCorrect
+        } else {
+            RoundState.LostWrongNoSolution(solution)
         }
     }
 
@@ -166,7 +178,10 @@ private fun Game24App() {
                 ops = ops,
                 paren = paren,
                 locked = locked,
-                onPickOp = { idx, op -> ops = ops.toMutableList().also { it[idx] = op } }
+                onPickOp = { idx, op ->
+                    actionMessage = null
+                    ops = ops.toMutableList().also { it[idx] = op }
+                }
             )
 
             // 括号吸附滑条（仍保留你喜欢的“滑条吸附”）
@@ -216,6 +231,13 @@ private fun Game24App() {
                 style = MaterialTheme.typography.bodySmall,
                 color = statusColor
             )
+            actionMessage?.let { message ->
+                Text(
+                    message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(Modifier.height(6.dp))
             Text(
@@ -246,6 +268,12 @@ private fun Game24App() {
             message = "此题其实有解（符合你的括号规则）：\n\n${s.solution}\n\n本局失败。",
             buttonText = "换一题",
             onClick = { resetRound() }
+        )
+        is RoundState.Info -> ResultDialog(
+            title = "提示",
+            message = s.message,
+            buttonText = "知道了",
+            onClick = { state = RoundState.Playing }
         )
     }
 }
@@ -295,22 +323,56 @@ private fun ExpressionPanel(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 真括号符号（不只是颜色）
-            BracketSymbol(show = (paren == ParenMode.AB), symbol = "(")
-            SlotNumber(nums[0], highlight = (paren == ParenMode.AB))
-            SlotOp(0, ops[0], enabled = !locked, highlight = (paren == ParenMode.AB), onPick = { onPickOp(0, it) })
-            SlotNumber(nums[1], highlight = (paren == ParenMode.AB) || (paren == ParenMode.BC))
-            BracketSymbol(show = (paren == ParenMode.AB), symbol = ")")
-
-            BracketSymbol(show = (paren == ParenMode.BC), symbol = "(")
-            SlotOp(1, ops[1], enabled = !locked, highlight = (paren == ParenMode.BC), onPick = { onPickOp(1, it) })
-            SlotNumber(nums[2], highlight = (paren == ParenMode.BC) || (paren == ParenMode.CD))
-            BracketSymbol(show = (paren == ParenMode.BC), symbol = ")")
-
-            BracketSymbol(show = (paren == ParenMode.CD), symbol = "(")
-            SlotOp(2, ops[2], enabled = !locked, highlight = (paren == ParenMode.CD), onPick = { onPickOp(2, it) })
-            SlotNumber(nums[3], highlight = (paren == ParenMode.CD))
-            BracketSymbol(show = (paren == ParenMode.CD), symbol = ")")
+            when (paren) {
+                ParenMode.AB -> {
+                    BracketGroup(highlight = true) {
+                        BracketSymbol(show = true, symbol = "(")
+                        SlotNumber(nums[0])
+                        SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
+                        SlotNumber(nums[1])
+                        BracketSymbol(show = true, symbol = ")")
+                    }
+                    SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
+                    SlotNumber(nums[2])
+                    SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
+                    SlotNumber(nums[3])
+                }
+                ParenMode.BC -> {
+                    SlotNumber(nums[0])
+                    SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
+                    BracketGroup(highlight = true) {
+                        BracketSymbol(show = true, symbol = "(")
+                        SlotNumber(nums[1])
+                        SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
+                        SlotNumber(nums[2])
+                        BracketSymbol(show = true, symbol = ")")
+                    }
+                    SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
+                    SlotNumber(nums[3])
+                }
+                ParenMode.CD -> {
+                    SlotNumber(nums[0])
+                    SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
+                    SlotNumber(nums[1])
+                    SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
+                    BracketGroup(highlight = true) {
+                        BracketSymbol(show = true, symbol = "(")
+                        SlotNumber(nums[2])
+                        SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
+                        SlotNumber(nums[3])
+                        BracketSymbol(show = true, symbol = ")")
+                    }
+                }
+                ParenMode.NONE -> {
+                    SlotNumber(nums[0])
+                    SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
+                    SlotNumber(nums[1])
+                    SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
+                    SlotNumber(nums[2])
+                    SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
+                    SlotNumber(nums[3])
+                }
+            }
         }
 
         Text(
@@ -336,13 +398,24 @@ private fun BracketSymbol(show: Boolean, symbol: String) {
 }
 
 @Composable
-private fun SlotNumber(n: Int, highlight: Boolean) {
+private fun BracketGroup(highlight: Boolean, content: @Composable RowScope.() -> Unit) {
     val bg = if (highlight) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
+    Row(
+        modifier = Modifier
+            .background(bg, RoundedCornerShape(14.dp))
+            .padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content
+    )
+}
+
+@Composable
+private fun SlotNumber(n: Int) {
     Box(
         modifier = Modifier
             .size(width = 44.dp, height = 52.dp)
-            .background(bg, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(12.dp)),
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(n.toString(), fontWeight = FontWeight.SemiBold)
@@ -351,14 +424,10 @@ private fun SlotNumber(n: Int, highlight: Boolean) {
 
 @Composable
 private fun SlotOp(
-    index: Int,
     value: Op?,
     enabled: Boolean,
-    highlight: Boolean,
     onPick: (Op) -> Unit
 ) {
-    val bg = if (highlight) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
-
     var showDialog by remember { mutableStateOf(false) }
 
     OutlinedButton(
@@ -366,7 +435,7 @@ private fun SlotOp(
         enabled = enabled,
         modifier = Modifier.size(width = 44.dp, height = 52.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = bg),
+        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         contentPadding = PaddingValues(0.dp)
     ) {
         Text(
@@ -581,6 +650,22 @@ private fun evalExact(nums: List<Int>, ops: List<Op>, paren: ParenMode): Frac? {
         if (!popApply()) return null
     }
     return vals.lastOrNull()
+}
+
+private fun findAnySolution(nums: List<Int>, paren: ParenMode): String? {
+    val ops = Op.values()
+    for (o1 in ops) {
+        for (o2 in ops) {
+            for (o3 in ops) {
+                val chosen = listOf(o1, o2, o3)
+                val result = evalExact(nums, chosen, paren)
+                if (result == Frac(24, 1)) {
+                    return formatExpr(nums, chosen, paren)
+                }
+            }
+        }
+    }
+    return null
 }
 
 private fun formatExpr(nums: List<Int>, ops: List<Op>, paren: ParenMode): String {
