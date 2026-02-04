@@ -157,11 +157,7 @@ private fun Game24App() {
     fun onNoSolution() {
         if (locked) return
         actionMessage = null
-        if (!slotsComplete) {
-            actionMessage = "请先把四个数字放入算式槽位，再判断无解。"
-            return
-        }
-        val solution = findAnySolutionAllParen(slots.filterNotNull())
+        val solution = findAnySolutionAllParen(nums)
         state = if (solution == null) RoundState.NoSolutionCorrect else RoundState.LostWrongNoSolution(solution)
     }
 
@@ -322,7 +318,7 @@ private fun Game24App() {
         )
         is RoundState.LostWrongNoSolution -> ResultDialog(
             title = "❌ 判定错误",
-            message = "此题其实有解（符合你的括号规则）：\n\n${s.solution}\n\n本局失败。",
+            message = "此题其实有解：\n\n${s.solution}\n\n本局失败。",
             buttonText = "换一题",
             onClick = { resetRound() }
         )
