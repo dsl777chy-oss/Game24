@@ -22,6 +22,7 @@ import com.example.game24.ui.theme.Game24Theme
 import kotlin.math.abs
 import kotlin.math.round
 
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -312,7 +313,7 @@ private fun Game24App() {
         )
         is RoundState.NoSolutionCorrect -> ResultDialog(
             title = "✔ 判定正确",
-            message = "此题在你的括号规则下无解。",
+            message = "此题无解。",
             buttonText = "下一题",
             onClick = { resetRound() }
         )
