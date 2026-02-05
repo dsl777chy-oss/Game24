@@ -412,83 +412,111 @@ private fun ExpressionPanel(
     onPickOp: (Int, Op) -> Unit,
     onSlotClick: (Int) -> Unit
 ) {
-    // 用 Box：左边 7 槽，右边固定 “= 24”
-    Box(modifier = Modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val safetyMargin = 8.dp
+        val minSlotW = 34.dp
+        val maxSlotW = 48.dp
+        val minSpacing = 2.dp
+        val maxSpacing = 8.dp
+        val bracketW = 9.dp
+        val bracketPadding = 2.dp
+        val available = maxWidth - safetyMargin
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(end = 72.dp), // 预留右侧“=24”的空间，避免挤没最后一个槽
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            when (paren) {
-                ParenMode.AB -> {
-                    BracketGroup(highlight = true) {
-                        BracketSymbol(show = true, symbol = "(")
-                        SlotNumber(value = slots[0], onClick = { onSlotClick(0) })
-                        SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
-                        SlotNumber(value = slots[1], onClick = { onSlotClick(1) })
-                        BracketSymbol(show = true, symbol = ")")
-                    }
-                    SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
-                    SlotNumber(value = slots[2], onClick = { onSlotClick(2) })
-                    SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
-                    SlotNumber(value = slots[3], onClick = { onSlotClick(3) })
-                }
-                ParenMode.BC -> {
-                    SlotNumber(value = slots[0], onClick = { onSlotClick(0) })
-                    SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
-                    BracketGroup(highlight = true) {
-                        BracketSymbol(show = true, symbol = "(")
-                        SlotNumber(value = slots[1], onClick = { onSlotClick(1) })
-                        SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
-                        SlotNumber(value = slots[2], onClick = { onSlotClick(2) })
-                        BracketSymbol(show = true, symbol = ")")
-                    }
-                    SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
-                    SlotNumber(value = slots[3], onClick = { onSlotClick(3) })
-                }
-                ParenMode.CD -> {
-                    SlotNumber(value = slots[0], onClick = { onSlotClick(0) })
-                    SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
-                    SlotNumber(value = slots[1], onClick = { onSlotClick(1) })
-                    SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
-                    BracketGroup(highlight = true) {
-                        BracketSymbol(show = true, symbol = "(")
-                        SlotNumber(value = slots[2], onClick = { onSlotClick(2) })
-                        SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
-                        SlotNumber(value = slots[3], onClick = { onSlotClick(3) })
-                        BracketSymbol(show = true, symbol = ")")
-                    }
-                }
-                ParenMode.NONE -> {
-                    SlotNumber(value = slots[0], onClick = { onSlotClick(0) })
-                    SlotOp(ops[0], enabled = !locked, onPick = { onPickOp(0, it) })
-                    SlotNumber(value = slots[1], onClick = { onSlotClick(1) })
-                    SlotOp(ops[1], enabled = !locked, onPick = { onPickOp(1, it) })
-                    SlotNumber(value = slots[2], onClick = { onSlotClick(2) })
-                    SlotOp(ops[2], enabled = !locked, onPick = { onPickOp(2, it) })
-                    SlotNumber(value = slots[3], onClick = { onSlotClick(3) })
-                }
-            }
+        fun totalWidth(slotW: Dp, spacing: Dp): Dp {
+            return slotW * 7 + spacing * 6 + bracketW * 2 + bracketPadding * 2
         }
 
-        Text(
-            "= 24",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.align(Alignment.CenterEnd)
-        )
+        var spacing = maxSpacing
+        var slotW = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
+            .coerceIn(minSlotW, maxSlotW)
+        var total = totalWidth(slotW, spacing)
+        if (total > available) {
+            spacing = minSpacing
+            slotW = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
+                .coerceIn(minSlotW, maxSlotW)
+            total = totalWidth(slotW, spacing)
+        }
+        if (total > available) {
+            slotW = minSlotW
+            total = totalWidth(slotW, spacing)
+        }
+        val slotH = (slotW * 1.15f).coerceIn(44.dp, 58.dp)
+
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterHorizontally),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                when (paren) {
+                    ParenMode.AB -> {
+                        BracketGroup(highlight = true, spacing = spacing, padding = bracketPadding) {
+                            BracketSymbol(show = true, symbol = "(", width = bracketW)
+                            SlotNumber(value = slots[0], width = slotW, height = slotH, onClick = { onSlotClick(0) })
+                            SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
+                            SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
+                            BracketSymbol(show = true, symbol = ")", width = bracketW)
+                        }
+                        SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
+                        SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
+                        SlotOp(ops[2], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(2, it) })
+                        SlotNumber(value = slots[3], width = slotW, height = slotH, onClick = { onSlotClick(3) })
+                    }
+                    ParenMode.BC -> {
+                        SlotNumber(value = slots[0], width = slotW, height = slotH, onClick = { onSlotClick(0) })
+                        SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
+                        BracketGroup(highlight = true, spacing = spacing, padding = bracketPadding) {
+                            BracketSymbol(show = true, symbol = "(", width = bracketW)
+                            SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
+                            SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
+                            SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
+                            BracketSymbol(show = true, symbol = ")", width = bracketW)
+                        }
+                        SlotOp(ops[2], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(2, it) })
+                        SlotNumber(value = slots[3], width = slotW, height = slotH, onClick = { onSlotClick(3) })
+                    }
+                    ParenMode.CD -> {
+                        SlotNumber(value = slots[0], width = slotW, height = slotH, onClick = { onSlotClick(0) })
+                        SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
+                        SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
+                        SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
+                        BracketGroup(highlight = true, spacing = spacing, padding = bracketPadding) {
+                            BracketSymbol(show = true, symbol = "(", width = bracketW)
+                            SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
+                            SlotOp(ops[2], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(2, it) })
+                            SlotNumber(value = slots[3], width = slotW, height = slotH, onClick = { onSlotClick(3) })
+                            BracketSymbol(show = true, symbol = ")", width = bracketW)
+                        }
+                    }
+                    ParenMode.NONE -> {
+                        SlotNumber(value = slots[0], width = slotW, height = slotH, onClick = { onSlotClick(0) })
+                        SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
+                        SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
+                        SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
+                        SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
+                        SlotOp(ops[2], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(2, it) })
+                        SlotNumber(value = slots[3], width = slotW, height = slotH, onClick = { onSlotClick(3) })
+                    }
+                }
+            }
+            Text(
+                "= 24",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.End,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp)
+            )
+        }
     }
 }
 
 @Composable
-private fun BracketSymbol(show: Boolean, symbol: String) {
+private fun BracketSymbol(show: Boolean, symbol: String, width: Dp) {
     // 占位宽度固定，不会把布局挤乱；show=false 时也占位避免跳动
     Box(
-        modifier = Modifier.width(10.dp),
+        modifier = Modifier.width(width),
         contentAlignment = Alignment.Center
     ) {
         if (show) {
@@ -498,20 +526,25 @@ private fun BracketSymbol(show: Boolean, symbol: String) {
 }
 
 @Composable
-private fun BracketGroup(highlight: Boolean, content: @Composable RowScope.() -> Unit) {
+private fun BracketGroup(
+    highlight: Boolean,
+    spacing: Dp,
+    padding: Dp,
+    content: @Composable RowScope.() -> Unit
+) {
     val bg = if (highlight) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
     Row(
         modifier = Modifier
             .background(bg, RoundedCornerShape(14.dp))
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .padding(horizontal = padding, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
         content = content
     )
 }
 
 @Composable
-private fun SlotNumber(value: Int?, onClick: () -> Unit) {
+private fun SlotNumber(value: Int?, width: Dp, height: Dp, onClick: () -> Unit) {
     val bg = if (value == null) {
         MaterialTheme.colorScheme.surface
     } else {
@@ -519,7 +552,7 @@ private fun SlotNumber(value: Int?, onClick: () -> Unit) {
     }
     Box(
         modifier = Modifier
-            .size(width = 44.dp, height = 52.dp)
+            .size(width = width, height = height)
             .background(bg, RoundedCornerShape(12.dp))
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
             .clickable { onClick() }
@@ -537,6 +570,8 @@ private fun SlotNumber(value: Int?, onClick: () -> Unit) {
 @Composable
 private fun SlotOp(
     value: Op?,
+    width: Dp,
+    height: Dp,
     enabled: Boolean,
     onPick: (Op) -> Unit
 ) {
@@ -545,7 +580,7 @@ private fun SlotOp(
     OutlinedButton(
         onClick = { if (enabled) showDialog = true },
         enabled = enabled,
-        modifier = Modifier.size(width = 44.dp, height = 52.dp),
+        modifier = Modifier.size(width = width, height = height),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         contentPadding = PaddingValues(0.dp)
