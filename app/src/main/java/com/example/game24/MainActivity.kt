@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.game24.ui.theme.Game24Theme
 import kotlin.math.abs
@@ -413,23 +415,23 @@ private fun ExpressionPanel(
     onSlotClick: (Int) -> Unit
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val safetyMargin = 8.dp
-        val minSlotW = 34.dp
-        val maxSlotW = 48.dp
-        val minSpacing = 2.dp
-        val maxSpacing = 8.dp
-        val bracketW = 9.dp
-        val bracketPadding = 2.dp
-        val available = maxWidth - safetyMargin
+        val safetyMargin: Dp = 8.dp
+        val minSlotW: Dp = 34.dp
+        val maxSlotW: Dp = 48.dp
+        val minSpacing: Dp = 2.dp
+        val maxSpacing: Dp = 8.dp
+        val bracketW: Dp = 9.dp
+        val bracketPadding: Dp = 2.dp
+        val maxW: Dp = this.maxWidth
+        val available: Dp = maxW - safetyMargin
 
-        fun totalWidth(slotW: Dp, spacing: Dp): Dp {
-            return slotW * 7 + spacing * 6 + bracketW * 2 + bracketPadding * 2
-        }
+        fun totalWidth(slotW: Dp, spacing: Dp): Dp =
+            slotW * 7 + spacing * 6 + bracketW * 2 + bracketPadding * 2
 
-        var spacing = maxSpacing
-        var slotW = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
+        var spacing: Dp = maxSpacing
+        var slotW: Dp = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
             .coerceIn(minSlotW, maxSlotW)
-        var total = totalWidth(slotW, spacing)
+        var total: Dp = totalWidth(slotW, spacing)
         if (total > available) {
             spacing = minSpacing
             slotW = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
