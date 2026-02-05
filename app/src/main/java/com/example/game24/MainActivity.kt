@@ -10,11 +10,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +58,12 @@ private enum class ParenMode(val label: String) { NONE("无"), AB("(1-2)"), BC("
 private enum class Op(val label: String) { ADD("+"), SUB("−"), MUL("×"), DIV("÷") }
 
 private const val DEBUG_TAG = "Game24"
+private val ArcadeAccent = Color(0xFF7C4DFF)
+private val ArcadeTeal = Color(0xFF26C6DA)
+private val ArcadeBlue = Color(0xFF42A5F5)
+private val ArcadeWarm = Color(0xFFFF7043)
+private val ArcadeBgTop = Color(0xFFF7F4FF)
+private val ArcadeBgBottom = Color(0xFFEEF9FF)
 
 private sealed class Tok {
     data class Num(val v: Frac) : Tok()
@@ -164,9 +176,21 @@ private fun Game24App() {
         state = if (solution == null) RoundState.NoSolutionCorrect else RoundState.LostWrongNoSolution(solution)
     }
 
+    val appBackground = Brush.verticalGradient(
+        listOf(
+            ArcadeBgTop,
+            Color.White,
+            ArcadeBgBottom
+        )
+    )
+
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
-            Surface(shadowElevation = 2.dp) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                shadowElevation = 4.dp
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -186,7 +210,10 @@ private fun Game24App() {
             }
         },
         bottomBar = {
-            Surface(shadowElevation = 8.dp) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                shadowElevation = 10.dp
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -197,120 +224,163 @@ private fun Game24App() {
                     OutlinedButton(
                         onClick = { onClear() },
                         enabled = !locked,
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = ArcadeBlue,
+                            disabledContentColor = ArcadeBlue.copy(alpha = 0.45f)
+                        ),
                         modifier = Modifier.weight(1f)
                     ) { Text("清空") }
 
                     OutlinedButton(
                         onClick = { onNoSolution() },
                         enabled = !locked,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, ArcadeWarm.copy(alpha = 0.7f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = ArcadeWarm,
+                            disabledContentColor = ArcadeWarm.copy(alpha = 0.4f)
+                        ),
                         modifier = Modifier.weight(1f)
                     ) { Text("无解") }
 
-                    Button(
+                    GradientActionButton(
                         onClick = { onCalculate() },
                         enabled = !locked && slotsComplete && opsComplete,
-                        modifier = Modifier.weight(1f)
-                    ) { Text("计算") }
+                        modifier = Modifier.weight(1f),
+                        text = "计算"
+                    )
                 }
             }
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
+                .fillMaxSize()
+                .background(appBackground)
                 .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-
-            // 数字池（可点选）
-            NumbersChips(
-                nums = nums,
-                slots = slots,
-                selectedPoolIndex = selectedPoolIndex,
-                locked = locked,
-                onSelect = { index ->
-                    if (locked) return@NumbersChips
-                    val usedNumbers = slots.filterNotNull().toSet()
-                    val candidate = nums[index]
-                    if (usedNumbers.contains(candidate)) {
-                        actionMessage = "该数字已在算式中。"
-                    } else {
-                        selectedPoolIndex = if (selectedPoolIndex == index) null else index
-                        actionMessage = null
-                    }
-                }
-            )
-
-            // 7 槽算式区（数字可放置 + 运算符可选 + 真括号符号）
-            ExpressionPanel(
-                slots = slots,
-                ops = ops,
-                paren = paren,
-                locked = locked,
-                onPickOp = { idx, op ->
-                    actionMessage = null
-                    ops = ops.toMutableList().also { it[idx] = op }
-                },
-                onSlotClick = { slotIndex ->
-                    if (locked) return@ExpressionPanel
-                    val current = slots[slotIndex]
-                    if (current != null) {
-                        slots = slots.toMutableList().also { it[slotIndex] = null }
-                        actionMessage = "已移回数字池。"
-                    } else if (selectedPoolIndex != null) {
-                        val candidate = nums[selectedPoolIndex!!]
-                        val usedNumbers = slots.filterNotNull().toSet()
-                        if (usedNumbers.contains(candidate)) {
-                            actionMessage = "该数字已在算式中。"
-                        } else {
-                            slots = slots.toMutableList().also { it[slotIndex] = candidate }
-                            selectedPoolIndex = null
-                            actionMessage = null
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
+                shadowElevation = 10.dp,
+                border = BorderStroke(1.dp, ArcadeAccent.copy(alpha = 0.2f)),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // 数字池（可点选）
+                    NumbersChips(
+                        nums = nums,
+                        slots = slots,
+                        selectedPoolIndex = selectedPoolIndex,
+                        locked = locked,
+                        onSelect = { index ->
+                            if (locked) return@NumbersChips
+                            val usedNumbers = slots.filterNotNull().toSet()
+                            val candidate = nums[index]
+                            if (usedNumbers.contains(candidate)) {
+                                actionMessage = "该数字已在算式中。"
+                            } else {
+                                selectedPoolIndex = if (selectedPoolIndex == index) null else index
+                                actionMessage = null
+                            }
                         }
-                    } else {
-                        actionMessage = "请先在数字池中选择一个数字。"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(
+                                Brush.radialGradient(
+                                    colors = listOf(
+                                        ArcadeAccent.copy(alpha = 0.12f),
+                                        ArcadeTeal.copy(alpha = 0.06f),
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                            .padding(6.dp)
+                    ) {
+                        // 7 槽算式区（数字可放置 + 运算符可选 + 真括号符号）
+                        ExpressionPanel(
+                            slots = slots,
+                            ops = ops,
+                            paren = paren,
+                            locked = locked,
+                            onPickOp = { idx, op ->
+                                actionMessage = null
+                                ops = ops.toMutableList().also { it[idx] = op }
+                            },
+                            onSlotClick = { slotIndex ->
+                                if (locked) return@ExpressionPanel
+                                val current = slots[slotIndex]
+                                if (current != null) {
+                                    slots = slots.toMutableList().also { it[slotIndex] = null }
+                                    actionMessage = "已移回数字池。"
+                                } else if (selectedPoolIndex != null) {
+                                    val candidate = nums[selectedPoolIndex!!]
+                                    val usedNumbers = slots.filterNotNull().toSet()
+                                    if (usedNumbers.contains(candidate)) {
+                                        actionMessage = "该数字已在算式中。"
+                                    } else {
+                                        slots = slots.toMutableList().also { it[slotIndex] = candidate }
+                                        selectedPoolIndex = null
+                                        actionMessage = null
+                                    }
+                                } else {
+                                    actionMessage = "请先在数字池中选择一个数字。"
+                                }
+                            }
+                        )
                     }
+
+                    // 括号吸附滑条（仍保留你喜欢的“滑条吸附”）
+                    ParenSlider(
+                        value = paren,
+                        enabled = !locked,
+                        onChange = { paren = it }
+                    )
+
+                    val statusText = when (hasSolution) {
+                        null -> if (!slotsComplete) "请先放入四个数字，再判断是否有解。" else "请选择三个运算符后再判断是否有解。"
+                        true -> "当前组合有解。"
+                        false -> "当前组合无解。"
+                    }
+                    val statusColor = when (hasSolution) {
+                        false -> MaterialTheme.colorScheme.error
+                        true -> ArcadeAccent
+                        null -> MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                    Text(
+                        statusText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = statusColor
+                    )
+                    actionMessage?.let { message ->
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "提示：运算符按钮点开后选择 + − × ÷，括号只允许一对相邻。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            )
-
-            // 括号吸附滑条（仍保留你喜欢的“滑条吸附”）
-            ParenSlider(
-                value = paren,
-                enabled = !locked,
-                onChange = { paren = it }
-            )
-
-            val statusText = when (hasSolution) {
-                null -> if (!slotsComplete) "请先放入四个数字，再判断是否有解。" else "请选择三个运算符后再判断是否有解。"
-                true -> "当前组合有解。"
-                false -> "当前组合无解。"
             }
-            val statusColor = when (hasSolution) {
-                false -> MaterialTheme.colorScheme.error
-                true -> MaterialTheme.colorScheme.primary
-                null -> MaterialTheme.colorScheme.onSurfaceVariant
-            }
-            Text(
-                statusText,
-                style = MaterialTheme.typography.bodySmall,
-                color = statusColor
-            )
-            actionMessage?.let { message ->
-                Text(
-                    message,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "提示：运算符按钮点开后选择 + − × ÷，括号只允许一对相邻。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 
@@ -362,25 +432,37 @@ private fun NumbersChips(
         nums.forEachIndexed { index, n ->
             val used = usedNumbers.contains(n)
             val selected = selectedPoolIndex == index
-            val bg = when {
-                used -> MaterialTheme.colorScheme.surfaceVariant
-                selected -> MaterialTheme.colorScheme.primaryContainer
-                else -> MaterialTheme.colorScheme.surface
-            }
+            val chipBrush = Brush.verticalGradient(
+                when {
+                    used || locked -> listOf(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f),
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                    )
+                    selected -> listOf(ArcadeAccent.copy(alpha = 0.95f), ArcadeTeal.copy(alpha = 0.85f))
+                    else -> listOf(ArcadeBlue.copy(alpha = 0.22f), MaterialTheme.colorScheme.surface)
+                }
+            )
             val contentColor = when {
                 used -> MaterialTheme.colorScheme.onSurfaceVariant
-                selected -> MaterialTheme.colorScheme.onPrimaryContainer
+                selected -> Color.White
                 else -> MaterialTheme.colorScheme.onSurface
             }
             Surface(
                 shape = RoundedCornerShape(999.dp),
-                tonalElevation = if (selected) 4.dp else 2.dp,
-                color = bg,
-                modifier = Modifier.height(30.dp)
+                color = Color.Transparent,
+                shadowElevation = if (selected) 10.dp else 3.dp,
+                border = BorderStroke(
+                    1.dp,
+                    if (selected) ArcadeAccent.copy(alpha = 0.6f) else ArcadeBlue.copy(alpha = 0.35f)
+                ),
+                modifier = Modifier
+                    .height(36.dp)
+                    .alpha(if (used || locked) 0.55f else 1f)
             ) {
                 Box(
                     modifier = Modifier
-                        .padding(horizontal = 12.dp)
+                        .background(chipBrush, CircleShape)
+                        .padding(horizontal = 14.dp)
                         .let { base ->
                             if (used || locked) {
                                 base
@@ -395,13 +477,21 @@ private fun NumbersChips(
             }
         }
         Spacer(Modifier.weight(1f))
-        Text(
-            "目标 = 24",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.End,
-            modifier = Modifier.widthIn(min = 72.dp)
-        )
+        Surface(
+            shape = RoundedCornerShape(12.dp),
+            color = ArcadeBlue.copy(alpha = 0.1f),
+            border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.32f)),
+            modifier = Modifier.widthIn(min = 88.dp)
+        ) {
+            Text(
+                "目标 = 24",
+                style = MaterialTheme.typography.titleSmall,
+                color = ArcadeBlue,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.End,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+            )
+        }
     }
 }
 
@@ -504,11 +594,15 @@ private fun ExpressionPanel(
             Text(
                 "= 24",
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                color = ArcadeAccent,
+                fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.End,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp)
+                    .padding(top = 8.dp)
+                    .background(ArcadeAccent.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                    .border(1.dp, ArcadeAccent.copy(alpha = 0.24f), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             )
         }
     }
@@ -534,10 +628,11 @@ private fun BracketGroup(
     padding: Dp,
     content: @Composable RowScope.() -> Unit
 ) {
-    val bg = if (highlight) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
+    val bg = if (highlight) ArcadeAccent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface
     Row(
         modifier = Modifier
             .background(bg, RoundedCornerShape(14.dp))
+            .border(1.dp, ArcadeAccent.copy(alpha = if (highlight) 0.32f else 0.12f), RoundedCornerShape(14.dp))
             .padding(horizontal = padding, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
@@ -547,21 +642,23 @@ private fun BracketGroup(
 
 @Composable
 private fun SlotNumber(value: Int?, width: Dp, height: Dp, onClick: () -> Unit) {
-    val bg = if (value == null) {
-        MaterialTheme.colorScheme.surface
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
+    val isEmpty = value == null
+    val bg = if (isEmpty) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    else ArcadeTeal.copy(alpha = 0.2f)
     Box(
         modifier = Modifier
             .size(width = width, height = height)
             .background(bg, RoundedCornerShape(12.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+            .border(
+                1.dp,
+                if (isEmpty) MaterialTheme.colorScheme.outline.copy(alpha = 0.35f) else ArcadeTeal.copy(alpha = 0.5f),
+                RoundedCornerShape(12.dp)
+            )
             .clickable { onClick() }
             .padding(2.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (value == null) {
+        if (isEmpty) {
             Text("空", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } else {
             Text(value.toString(), fontWeight = FontWeight.SemiBold)
@@ -582,15 +679,28 @@ private fun SlotOp(
     OutlinedButton(
         onClick = { if (enabled) showDialog = true },
         enabled = enabled,
-        modifier = Modifier.size(width = width, height = height),
+        modifier = Modifier
+            .size(width = width, height = height)
+            .shadow(if (value == null) 0.dp else 8.dp, RoundedCornerShape(12.dp)),
         shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = BorderStroke(
+            1.dp,
+            if (value == null) ArcadeBlue.copy(alpha = 0.4f) else ArcadeAccent.copy(alpha = 0.58f)
+        ),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = if (value == null) {
+                ArcadeBlue.copy(alpha = 0.12f)
+            } else {
+                ArcadeAccent.copy(alpha = 0.18f)
+            }
+        ),
         contentPadding = PaddingValues(0.dp)
     ) {
         Text(
             text = value?.label ?: "？",
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
+            color = if (value == null) ArcadeBlue else ArcadeAccent,
             textAlign = TextAlign.Center
         )
     }
@@ -598,6 +708,9 @@ private fun SlotOp(
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp,
             title = { Text("选择运算符") },
             text = {
                 Row(
@@ -623,7 +736,13 @@ private fun SlotOp(
 @Composable
 private fun ParenSlider(value: ParenMode, enabled: Boolean, onChange: (ParenMode) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("括号：${value.label}", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "括号",
+            style = MaterialTheme.typography.labelLarge,
+            color = ArcadeAccent,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text("当前：${value.label}", style = MaterialTheme.typography.bodyMedium)
 
         val raw = when (value) {
             ParenMode.NONE -> 0f
@@ -636,44 +755,120 @@ private fun ParenSlider(value: ParenMode, enabled: Boolean, onChange: (ParenMode
             temp = raw
         }
 
-        Slider(
-            value = temp,
-            onValueChange = { if (enabled) temp = it },
-            valueRange = 0f..3f,
-            steps = 2,
-            enabled = enabled,
-            onValueChangeFinished = {
-                val snapped = temp.roundToIntClamped(0, 3)
-                onChange(
-                    when (snapped) {
-                        0 -> ParenMode.NONE
-                        1 -> ParenMode.AB
-                        2 -> ParenMode.BC
-                        else -> ParenMode.CD
-                    }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                ArcadeAccent.copy(alpha = 0.85f),
+                                ArcadeTeal.copy(alpha = 0.9f),
+                                ArcadeBlue.copy(alpha = 0.85f)
+                            )
+                        )
+                    )
+                    .alpha(if (enabled) 0.45f else 0.2f)
+            )
+            Slider(
+                value = temp,
+                onValueChange = { if (enabled) temp = it },
+                valueRange = 0f..3f,
+                steps = 2,
+                enabled = enabled,
+                onValueChangeFinished = {
+                    val snapped = temp.roundToIntClamped(0, 3)
+                    onChange(
+                        when (snapped) {
+                            0 -> ParenMode.NONE
+                            1 -> ParenMode.AB
+                            2 -> ParenMode.BC
+                            else -> ParenMode.CD
+                        }
+                    )
+                    temp = snapped.toFloat()
+                },
+                colors = SliderDefaults.colors(
+                    thumbColor = ArcadeAccent,
+                    activeTrackColor = Color.Transparent,
+                    inactiveTrackColor = Color.Transparent
                 )
-                temp = snapped.toFloat()
-            }
-        )
+            )
+        }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("无")
-            Text("(1-2)")
-            Text("(2-3)")
-            Text("(3-4)")
+            Text("无", style = MaterialTheme.typography.labelMedium)
+            Text("(1-2)", style = MaterialTheme.typography.labelMedium)
+            Text("(2-3)", style = MaterialTheme.typography.labelMedium)
+            Text("(3-4)", style = MaterialTheme.typography.labelMedium)
         }
     }
 }
 
 @Composable
 private fun ResultDialog(title: String, message: String, buttonText: String, onClick: () -> Unit) {
+    val isSuccess = title.contains("成功") || title.contains("正确")
+    val isError = title.contains("错误")
+    val tint = when {
+        isSuccess -> Color(0xFF2E7D32)
+        isError -> MaterialTheme.colorScheme.error
+        else -> ArcadeAccent
+    }
     AlertDialog(
         onDismissRequest = {},
-        title = { Text(title) },
+        shape = RoundedCornerShape(24.dp),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 10.dp,
+        title = { Text(title, color = tint, fontWeight = FontWeight.Bold) },
         text = { Text(message) },
         confirmButton = {
-            Button(onClick = onClick) { Text(buttonText) }
+            GradientActionButton(onClick = onClick, enabled = true, text = buttonText)
         }
     )
+}
+
+@Composable
+private fun GradientActionButton(onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier, text: String) {
+    val shape = RoundedCornerShape(14.dp)
+    val brush = if (enabled) {
+        Brush.horizontalGradient(listOf(ArcadeAccent, ArcadeTeal))
+    } else {
+        Brush.horizontalGradient(
+            listOf(
+                MaterialTheme.colorScheme.surfaceVariant,
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+            )
+        )
+    }
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier,
+        shape = shape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color.Transparent,
+            disabledContainerColor = Color.Transparent,
+            contentColor = Color.White,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        contentPadding = PaddingValues(0.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(brush, shape)
+                .padding(vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text, fontWeight = FontWeight.SemiBold)
+        }
+    }
 }
 
 /** =========================
