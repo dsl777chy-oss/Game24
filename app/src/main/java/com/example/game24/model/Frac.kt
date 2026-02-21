@@ -1,4 +1,4 @@
-package com.example.game24.model
+package com.spx.game24.model
 
 import kotlin.math.abs
 
@@ -26,3 +26,4 @@ fun gcd(a: Long, b: Long): Long {
     while (y != 0L) { val t = x % y; x = y; y = t }
     return if (x == 0L) 1L else x
 }
+

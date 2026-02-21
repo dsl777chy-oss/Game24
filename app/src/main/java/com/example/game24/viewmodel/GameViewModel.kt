@@ -1,9 +1,9 @@
-package com.example.game24.viewmodel
+package com.spx.game24.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.example.game24.R
-import com.example.game24.logic.*
-import com.example.game24.model.*
+import com.spx.game24.R
+import com.spx.game24.logic.*
+import com.spx.game24.model.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,3 +165,4 @@ class GameViewModel : ViewModel() {
         _uiState.update { it.copy(roundState = RoundState.Playing) }
     }
 }
+

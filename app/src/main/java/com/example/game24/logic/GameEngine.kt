@@ -1,6 +1,6 @@
-package com.example.game24.logic
+package com.spx.game24.logic
 
-import com.example.game24.model.*
+import com.spx.game24.model.*
 
 fun precedence(op: Op): Int = when (op) {
     Op.MUL, Op.DIV -> 2
@@ -173,3 +173,4 @@ fun formatExpr(nums: List<Int>, ops: List<Op>, paren: ParenMode): String {
 }
 
 fun random4(): List<Int> = (1..9).shuffled().take(4)
+

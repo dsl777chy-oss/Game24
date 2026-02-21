@@ -1,4 +1,4 @@
-package com.example.game24.model
+package com.spx.game24.model
 
 enum class ParenMode(val label: String) {
     NONE("无"), AB("(1-2)"), BC("(2-3)"), CD("(3-4)")
@@ -22,3 +22,4 @@ sealed class RoundState {
     data class LostWrongNoSolution(val solution: String) : RoundState()
     data class Info(val message: String) : RoundState()
 }
+

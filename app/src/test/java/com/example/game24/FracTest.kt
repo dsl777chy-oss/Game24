@@ -1,6 +1,6 @@
-package com.example.game24
+package com.spx.game24
 
-import com.example.game24.model.Frac
+import com.spx.game24.model.Frac
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -92,3 +92,4 @@ class FracTest {
         Frac(1, 0)
     }
 }
+

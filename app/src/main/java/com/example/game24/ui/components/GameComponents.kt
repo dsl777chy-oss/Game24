@@ -1,4 +1,4 @@
-package com.example.game24.ui.components
+package com.spx.game24.ui.components
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -25,10 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.game24.R
-import com.example.game24.model.Op
-import com.example.game24.model.ParenMode
-import com.example.game24.ui.theme.LocalGameColors
+import com.spx.game24.R
+import com.spx.game24.model.Op
+import com.spx.game24.model.ParenMode
+import com.spx.game24.ui.theme.LocalGameColors
 import kotlin.math.round
 
 @Composable
@@ -468,3 +468,4 @@ fun Float.roundToIntClamped(min: Int, max: Int): Int {
     val r = round(this).toInt()
     return r.coerceIn(min, max)
 }
+

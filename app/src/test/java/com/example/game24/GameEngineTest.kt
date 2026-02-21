@@ -1,7 +1,7 @@
-package com.example.game24
+package com.spx.game24
 
-import com.example.game24.logic.*
-import com.example.game24.model.*
+import com.spx.game24.logic.*
+import com.spx.game24.model.*
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -147,3 +147,4 @@ class GameEngineTest {
         assertEquals(Tok.R, tokens[4])
     }
 }
+
