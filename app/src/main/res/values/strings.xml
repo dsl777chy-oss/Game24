@@ -1,3 +1,49 @@
 <resources>
     <string name="app_name">Game24</string>
+    <string name="title_24">24 点</string>
+    <string name="btn_next_question">换一题</string>
+    <string name="btn_clear">清空</string>
+    <string name="btn_no_solution">无解</string>
+    <string name="btn_calculate">计算</string>
+    <string name="btn_cancel">取消</string>
+    <string name="label_numbers">数字：</string>
+    <string name="label_parenthesis">括号</string>
+    <string name="target_24">目标 = 24</string>
+    <string name="slot_empty">空</string>
+
+    <string name="msg_already_clear">当前已是空白。</string>
+    <string name="msg_cleared">已清空。</string>
+    <string name="msg_fill_slots_first">请先把四个数字放入算式槽位。</string>
+    <string name="msg_fill_ops_first">请先选满三个运算符。</string>
+    <string name="msg_div_by_zero">算式包含除零，无法计算。</string>
+    <string name="msg_not_24">结果不是 24，可继续调整。</string>
+    <string name="msg_number_already_used">该数字已在算式中。</string>
+    <string name="msg_returned_to_pool">已移回数字池。</string>
+    <string name="msg_select_number_first">请先在数字池中选择一个数字。</string>
+
+    <string name="status_fill_numbers">请先放入四个数字，再判断是否有解。</string>
+    <string name="status_fill_ops">请选择三个运算符后再判断是否有解。</string>
+    <string name="status_has_solution">当前组合有解。</string>
+    <string name="status_no_solution">当前组合无解。</string>
+
+    <string name="hint_usage">提示：运算符按钮点开后选择 + − × ÷，括号只允许一对相邻。</string>
+
+    <string name="dialog_success_title">🎉 成功</string>
+    <string name="dialog_correct_title">✔ 判定正确</string>
+    <string name="dialog_wrong_title">❌ 判定错误</string>
+    <string name="dialog_hint_title">提示</string>
+    <string name="dialog_no_solution_msg">此题无解。</string>
+    <string name="dialog_has_solution_msg">此题其实有解：\n\n%1$s\n\n本局失败。</string>
+    <string name="dialog_btn_next">下一题</string>
+    <string name="dialog_btn_change">换一题</string>
+    <string name="dialog_btn_ok">知道了</string>
+    <string name="dialog_select_operator">选择运算符</string>
+
+    <string name="a11y_number_selected">数字 %1$d，已选中</string>
+    <string name="a11y_number_used">数字 %1$d，已使用</string>
+    <string name="a11y_number_available">数字 %1$d，可选</string>
+    <string name="a11y_slot_empty">空槽位，点击放入数字</string>
+    <string name="a11y_slot_number">槽位数字 %1$d，点击移除</string>
+    <string name="a11y_operator">运算符 %1$s</string>
+    <string name="a11y_operator_empty">运算符槽位，点击选择</string>
 </resources>

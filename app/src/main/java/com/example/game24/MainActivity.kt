@@ -1,37 +1,77 @@
-package com.example.game24
+package com.spx.game24
 
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.*
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.game24.ui.theme.Game24Theme
-import kotlin.math.abs
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.spx.game24.domain.Frac
+import com.spx.game24.domain.Op
+import com.spx.game24.domain.ParenMode
+import com.spx.game24.ui.theme.Game24Theme
 import kotlin.math.round
 
+private val ArcadeAccent = Color(0xFF7C4DFF)
+private val ArcadeTeal = Color(0xFF26C6DA)
+private val ArcadeBlue = Color(0xFF42A5F5)
+private val ArcadeWarm = Color(0xFFFF7043)
+private val ArcadeBgTop = Color(0xFFF7F4FF)
+private val ArcadeBgBottom = Color(0xFFEEF9FF)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -46,148 +86,25 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/** =======================
- *  规则（按你最终确认）
- *  - 每题 4 个数字：1..9 不重复（顺序固定）
- *  - 运算符：+ - × ÷（必须选满 3 个）
- *  - 括号：最多一对，只能括相邻：(1-2)/(2-3)/(3-4) 或无括号
- *  - 无提示；无解按钮：点了即结束
- *      - 若其实有解（按你的括号规则）=> 失败并展示一个“符合规则”的解
- *      - 若确实无解 => 判定正确
- * ======================= */
-
-private enum class ParenMode(val label: String) { NONE("无"), AB("(1-2)"), BC("(2-3)"), CD("(3-4)") }
-private enum class Op(val label: String) { ADD("+"), SUB("−"), MUL("×"), DIV("÷") }
-
-private const val DEBUG_TAG = "Game24"
-private val ArcadeAccent = Color(0xFF7C4DFF)
-private val ArcadeTeal = Color(0xFF26C6DA)
-private val ArcadeBlue = Color(0xFF42A5F5)
-private val ArcadeWarm = Color(0xFFFF7043)
-private val ArcadeBgTop = Color(0xFFF7F4FF)
-private val ArcadeBgBottom = Color(0xFFEEF9FF)
-
-private sealed class Tok {
-    data class Num(val v: Frac) : Tok()
-    data class Oper(val op: Op) : Tok()
-    object L : Tok()
-    object R : Tok()
-}
-
-private sealed class RoundState {
-    data object Playing : RoundState()
-    data class Won(val expr: String) : RoundState()
-    data object NoSolutionCorrect : RoundState()
-    data class LostWrongNoSolution(val solution: String) : RoundState()
-    data class Info(val message: String) : RoundState()
-}
-
 @Composable
-private fun Game24App() {
-    var nums by remember { mutableStateOf(random4()) }
-    var slots by remember { mutableStateOf(listOf<Int?>(null, null, null, null)) }
-    var selectedPoolIndex by remember { mutableStateOf<Int?>(null) }
-    var ops by remember { mutableStateOf(listOf<Op?>(null, null, null)) }
-    var paren by remember { mutableStateOf(ParenMode.NONE) }
-    var state by remember { mutableStateOf<RoundState>(RoundState.Playing) }
-    var actionMessage by remember { mutableStateOf<String?>(null) }
+private fun Game24App(viewModel: Game24ViewModel = viewModel()) {
+    val uiState = viewModel.uiState
+    val hasSolution = viewModel.hasSolution()
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    val locked = state !is RoundState.Playing
-    val opsComplete = ops.all { it != null }
-    val slotsComplete = slots.all { it != null }
-    val hasSolution by remember(slots, ops, paren) {
-        derivedStateOf {
-            if (!opsComplete || !slotsComplete) {
-                null
-            } else {
-                evalExact(slots.filterNotNull(), ops.filterNotNull(), paren) == Frac(24, 1)
-            }
-        }
-    }
-
-    LaunchedEffect(nums, slots, ops, paren, hasSolution) {
-        if (BuildConfig.DEBUG) {
-            val opsSelected = ops.filterNotNull()
-            val tokens = if (opsComplete && slotsComplete) {
-                buildTokens(slots.filterNotNull(), opsSelected, paren)
-            } else {
-                emptyList()
-            }
-            val tokenText = if (opsComplete && slotsComplete) tokensToString(tokens) else "incomplete"
-            Log.d(
-                DEBUG_TAG,
-                "nums=$nums slots=$slots ops=$ops paren=$paren tokens=$tokenText hasSolution=$hasSolution"
-            )
-        }
-    }
-
-    fun resetRound() {
-        nums = random4()
-        slots = listOf(null, null, null, null)
-        selectedPoolIndex = null
-        ops = listOf(null, null, null)
-        paren = ParenMode.NONE
-        state = RoundState.Playing
-        actionMessage = null
-    }
-
-    fun onClear() {
-        if (locked) return
-        val alreadyClear = ops.all { it == null } && paren == ParenMode.NONE && slots.all { it == null }
-        if (alreadyClear) {
-            actionMessage = "当前已是空白。"
-        } else {
-            slots = listOf(null, null, null, null)
-            selectedPoolIndex = null
-            ops = listOf(null, null, null)
-            paren = ParenMode.NONE
-            state = RoundState.Playing
-            actionMessage = "已清空。"
-        }
-    }
-
-    fun onCalculate() {
-        if (locked) return
-        if (!slotsComplete) {
-            actionMessage = "请先把四个数字放入算式槽位。"
-            return
-        }
-        if (ops.any { it == null }) {
-            actionMessage = "请先选满三个运算符。"
-            return
-        }
-        val chosen = ops.filterNotNull()
-        val result = evalExact(slots.filterNotNull(), chosen, paren)
-        if (result == null) {
-            actionMessage = "算式包含除零，无法计算。"
-            return
-        }
-        if (result == Frac(24, 1)) {
-            state = RoundState.Won(formatExpr(slots.filterNotNull(), chosen, paren))
-            actionMessage = null
-        } else {
-            // 按你规则：算错不算输，不提示，继续改
-            actionMessage = "结果不是 24，可继续调整。"
-        }
-    }
-
-    fun onNoSolution() {
-        if (locked) return
-        actionMessage = null
-        val solution = findAnySolutionAllParen(nums)
-        state = if (solution == null) RoundState.NoSolutionCorrect else RoundState.LostWrongNoSolution(solution)
+    LaunchedEffect(uiState.actionMessage) {
+        val msg = uiState.actionMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        viewModel.consumeActionMessage()
     }
 
     val appBackground = Brush.verticalGradient(
-        listOf(
-            ArcadeBgTop,
-            Color.White,
-            ArcadeBgBottom
-        )
+        listOf(ArcadeBgTop, Color.White, ArcadeBgBottom)
     )
 
     Scaffold(
         containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             Surface(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
@@ -205,7 +122,11 @@ private fun Game24App() {
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f)
                     )
-                    TextButton(onClick = { if (!locked) resetRound() }, enabled = !locked) {
+                    TextButton(
+                        onClick = { if (!uiState.locked) viewModel.resetRound() },
+                        enabled = !uiState.locked,
+                        modifier = Modifier.semantics { contentDescription = "换一题" }
+                    ) {
                         Text("换一题")
                     }
                 }
@@ -224,33 +145,39 @@ private fun Game24App() {
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { onClear() },
-                        enabled = !locked,
+                        onClick = { viewModel.clearBoard() },
+                        enabled = !uiState.locked,
                         shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(1.dp, ArcadeBlue.copy(alpha = 0.6f)),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = ArcadeBlue,
                             disabledContentColor = ArcadeBlue.copy(alpha = 0.45f)
                         ),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = "清空输入" }
                     ) { Text("清空") }
 
                     OutlinedButton(
-                        onClick = { onNoSolution() },
-                        enabled = !locked,
+                        onClick = { viewModel.declareNoSolution() },
+                        enabled = !uiState.locked,
                         shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(1.dp, ArcadeWarm.copy(alpha = 0.7f)),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = ArcadeWarm,
                             disabledContentColor = ArcadeWarm.copy(alpha = 0.4f)
                         ),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = "声明无解" }
                     ) { Text("无解") }
 
                     GradientActionButton(
-                        onClick = { onCalculate() },
-                        enabled = !locked && slotsComplete && opsComplete,
-                        modifier = Modifier.weight(1f),
+                        onClick = { viewModel.calculate() },
+                        enabled = !uiState.locked && uiState.slotsComplete && uiState.opsComplete,
+                        modifier = Modifier
+                            .weight(1f)
+                            .semantics { contentDescription = "计算结果" },
                         text = "计算"
                     )
                 }
@@ -278,23 +205,12 @@ private fun Game24App() {
                         .padding(horizontal = 14.dp, vertical = 14.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // 数字池（可点选）
                     NumbersChips(
-                        nums = nums,
-                        slots = slots,
-                        selectedPoolIndex = selectedPoolIndex,
-                        locked = locked,
-                        onSelect = { index ->
-                            if (locked) return@NumbersChips
-                            val usedNumbers = slots.filterNotNull().toSet()
-                            val candidate = nums[index]
-                            if (usedNumbers.contains(candidate)) {
-                                actionMessage = "该数字已在算式中。"
-                            } else {
-                                selectedPoolIndex = if (selectedPoolIndex == index) null else index
-                                actionMessage = null
-                            }
-                        }
+                        nums = uiState.nums,
+                        slots = uiState.slots,
+                        selectedPoolIndex = uiState.selectedPoolIndex,
+                        locked = uiState.locked,
+                        onSelect = viewModel::selectPoolNumber
                     )
 
                     Box(
@@ -312,48 +228,28 @@ private fun Game24App() {
                             )
                             .padding(6.dp)
                     ) {
-                        // 7 槽算式区（数字可放置 + 运算符可选 + 真括号符号）
                         ExpressionPanel(
-                            slots = slots,
-                            ops = ops,
-                            paren = paren,
-                            locked = locked,
-                            onPickOp = { idx, op ->
-                                actionMessage = null
-                                ops = ops.toMutableList().also { it[idx] = op }
-                            },
-                            onSlotClick = { slotIndex ->
-                                if (locked) return@ExpressionPanel
-                                val current = slots[slotIndex]
-                                if (current != null) {
-                                    slots = slots.toMutableList().also { it[slotIndex] = null }
-                                    actionMessage = "已移回数字池。"
-                                } else if (selectedPoolIndex != null) {
-                                    val candidate = nums[selectedPoolIndex!!]
-                                    val usedNumbers = slots.filterNotNull().toSet()
-                                    if (usedNumbers.contains(candidate)) {
-                                        actionMessage = "该数字已在算式中。"
-                                    } else {
-                                        slots = slots.toMutableList().also { it[slotIndex] = candidate }
-                                        selectedPoolIndex = null
-                                        actionMessage = null
-                                    }
-                                } else {
-                                    actionMessage = "请先在数字池中选择一个数字。"
-                                }
-                            }
+                            slots = uiState.slots,
+                            ops = uiState.ops,
+                            paren = uiState.paren,
+                            locked = uiState.locked,
+                            onPickOp = viewModel::pickOp,
+                            onSlotClick = viewModel::clickSlot
                         )
                     }
 
-                    // 括号吸附滑条（仍保留你喜欢的“滑条吸附”）
                     ParenSlider(
-                        value = paren,
-                        enabled = !locked,
-                        onChange = { paren = it }
+                        value = uiState.paren,
+                        enabled = !uiState.locked,
+                        onChange = viewModel::setParen
                     )
 
                     val statusText = when (hasSolution) {
-                        null -> if (!slotsComplete) "请先放入四个数字，再判断是否有解。" else "请选择三个运算符后再判断是否有解。"
+                        null -> if (!uiState.slotsComplete) {
+                            "请先放入四个数字，再判断是否有解。"
+                        } else {
+                            "请选择三个运算符后再判断是否有解。"
+                        }
                         true -> "当前组合有解。"
                         false -> "当前组合无解。"
                     }
@@ -367,13 +263,6 @@ private fun Game24App() {
                         style = MaterialTheme.typography.bodySmall,
                         color = statusColor
                     )
-                    actionMessage?.let { message ->
-                        Text(
-                            message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
 
                     Spacer(Modifier.height(4.dp))
                     Text(
@@ -386,32 +275,25 @@ private fun Game24App() {
         }
     }
 
-    // 弹窗锁盘
-    when (val s = state) {
+    when (val roundState = uiState.roundState) {
         is RoundState.Playing -> Unit
         is RoundState.Won -> ResultDialog(
-            title = "🎉 成功",
-            message = s.expr,
+            title = "成功",
+            message = roundState.expr,
             buttonText = "下一题",
-            onClick = { resetRound() }
+            onClick = { viewModel.resetRound() }
         )
         is RoundState.NoSolutionCorrect -> ResultDialog(
-            title = "✔ 判定正确",
+            title = "判定正确",
             message = "此题无解。",
             buttonText = "下一题",
-            onClick = { resetRound() }
+            onClick = { viewModel.resetRound() }
         )
         is RoundState.LostWrongNoSolution -> ResultDialog(
-            title = "❌ 判定错误",
-            message = "此题其实有解：\n\n${s.solution}\n\n本局失败。",
+            title = "判定错误",
+            message = "此题其实有解：\n\n${roundState.solution}\n\n本局失败。",
             buttonText = "换一题",
-            onClick = { resetRound() }
-        )
-        is RoundState.Info -> ResultDialog(
-            title = "提示",
-            message = s.message,
-            buttonText = "知道了",
-            onClick = { state = RoundState.Playing }
+            onClick = { viewModel.resetRound() }
         )
     }
 }
@@ -469,7 +351,9 @@ private fun NumbersChips(
                             if (used || locked) {
                                 base
                             } else {
-                                base.clickable { onSelect(index) }
+                                base
+                                    .clickable { onSelect(index) }
+                                    .semantics { contentDescription = "数字 $n" }
                             }
                         },
                     contentAlignment = Alignment.Center
@@ -514,8 +398,7 @@ private fun ExpressionPanel(
         val maxSpacing: Dp = 8.dp
         val bracketW: Dp = 9.dp
         val bracketPadding: Dp = 2.dp
-        val maxW: Dp = this.maxWidth
-        val available: Dp = maxW - safetyMargin
+        val available: Dp = maxWidth - safetyMargin
 
         fun totalWidth(slotW: Dp, spacing: Dp): Dp =
             slotW * 7 + spacing * 6 + bracketW * 2 + bracketPadding * 2
@@ -530,10 +413,7 @@ private fun ExpressionPanel(
                 .coerceIn(minSlotW, maxSlotW)
             total = totalWidth(slotW, spacing)
         }
-        if (total > available) {
-            slotW = minSlotW
-            total = totalWidth(slotW, spacing)
-        }
+        if (total > available) slotW = minSlotW
         val slotH = (slotW * 1.15f).coerceIn(44.dp, 58.dp)
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -612,14 +492,11 @@ private fun ExpressionPanel(
 
 @Composable
 private fun BracketSymbol(show: Boolean, symbol: String, width: Dp) {
-    // 占位宽度固定，不会把布局挤乱；show=false 时也占位避免跳动
     Box(
         modifier = Modifier.width(width),
         contentAlignment = Alignment.Center
     ) {
-        if (show) {
-            Text(symbol, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-        }
+        if (show) Text(symbol, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
@@ -657,6 +534,7 @@ private fun SlotNumber(value: Int?, width: Dp, height: Dp, onClick: () -> Unit) 
                 RoundedCornerShape(12.dp)
             )
             .clickable { onClick() }
+            .semantics { contentDescription = if (isEmpty) "空数字槽位" else "数字 ${value}" }
             .padding(2.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -683,18 +561,15 @@ private fun SlotOp(
         enabled = enabled,
         modifier = Modifier
             .size(width = width, height = height)
-            .shadow(if (value == null) 0.dp else 8.dp, RoundedCornerShape(12.dp)),
+            .shadow(if (value == null) 0.dp else 8.dp, RoundedCornerShape(12.dp))
+            .semantics { contentDescription = "运算符选择" },
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(
             1.dp,
             if (value == null) ArcadeBlue.copy(alpha = 0.4f) else ArcadeAccent.copy(alpha = 0.58f)
         ),
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = if (value == null) {
-                ArcadeBlue.copy(alpha = 0.12f)
-            } else {
-                ArcadeAccent.copy(alpha = 0.18f)
-            }
+            containerColor = if (value == null) ArcadeBlue.copy(alpha = 0.12f) else ArcadeAccent.copy(alpha = 0.18f)
         ),
         contentPadding = PaddingValues(0.dp)
     ) {
@@ -728,9 +603,7 @@ private fun SlotOp(
                     }
                 }
             },
-            confirmButton = {
-                TextButton(onClick = { showDialog = false }) { Text("取消") }
-            }
+            confirmButton = { TextButton(onClick = { showDialog = false }) { Text("取消") } }
         )
     }
 }
@@ -829,9 +702,7 @@ private fun ResultDialog(title: String, message: String, buttonText: String, onC
         tonalElevation = 10.dp,
         title = { Text(title, color = tint, fontWeight = FontWeight.Bold) },
         text = { Text(message) },
-        confirmButton = {
-            GradientActionButton(onClick = onClick, enabled = true, text = buttonText)
-        }
+        confirmButton = { GradientActionButton(onClick = onClick, enabled = true, text = buttonText) }
     )
 }
 
@@ -872,174 +743,6 @@ private fun GradientActionButton(onClick: () -> Unit, enabled: Boolean, modifier
         }
     }
 }
-
-/** =========================
- *  数学：分数（精确）
- * ========================= */
-private data class Frac(val n: Int, val d: Int) {
-    init { require(d != 0) }
-
-    fun norm(): Frac {
-        var nn = n
-        var dd = d
-        if (dd < 0) { nn = -nn; dd = -dd }
-        val g = gcd(abs(nn), dd)
-        return Frac(nn / g, dd / g)
-    }
-
-    operator fun plus(o: Frac) = Frac(n * o.d + o.n * d, d * o.d).norm()
-    operator fun minus(o: Frac) = Frac(n * o.d - o.n * d, d * o.d).norm()
-    operator fun times(o: Frac) = Frac(n * o.n, d * o.d).norm()
-    operator fun div(o: Frac): Frac? = if (o.n == 0) null else Frac(n * o.d, d * o.n).norm()
-}
-
-private fun gcd(a: Int, b: Int): Int {
-    var x = a; var y = b
-    while (y != 0) { val t = x % y; x = y; y = t }
-    return if (x == 0) 1 else x
-}
-
-private fun precedence(op: Op): Int = when (op) {
-    Op.MUL, Op.DIV -> 2
-    Op.ADD, Op.SUB -> 1
-}
-
-private fun buildTokens(nums: List<Int>, ops: List<Op>, paren: ParenMode): List<Tok> {
-    val a = Frac(nums[0], 1)
-    val b = Frac(nums[1], 1)
-    val c = Frac(nums[2], 1)
-    val d = Frac(nums[3], 1)
-    val (o1, o2, o3) = ops
-    return when (paren) {
-        ParenMode.NONE -> listOf(
-            Tok.Num(a), Tok.Oper(o1), Tok.Num(b), Tok.Oper(o2), Tok.Num(c), Tok.Oper(o3), Tok.Num(d)
-        )
-        ParenMode.AB -> listOf(
-            Tok.L, Tok.Num(a), Tok.Oper(o1), Tok.Num(b), Tok.R, Tok.Oper(o2), Tok.Num(c), Tok.Oper(o3), Tok.Num(d)
-        )
-        ParenMode.BC -> listOf(
-            Tok.Num(a), Tok.Oper(o1), Tok.L, Tok.Num(b), Tok.Oper(o2), Tok.Num(c), Tok.R, Tok.Oper(o3), Tok.Num(d)
-        )
-        ParenMode.CD -> listOf(
-            Tok.Num(a), Tok.Oper(o1), Tok.Num(b), Tok.Oper(o2), Tok.L, Tok.Num(c), Tok.Oper(o3), Tok.Num(d), Tok.R
-        )
-    }
-}
-
-private fun tokensToString(tokens: List<Tok>): String = tokens.joinToString(" ") { tok ->
-    when (tok) {
-        Tok.L -> "("
-        Tok.R -> ")"
-        is Tok.Num -> tok.v.n.toString() + "/" + tok.v.d.toString()
-        is Tok.Oper -> tok.op.label
-    }
-}
-
-/**
- * 正确求值：支持 ×÷ 优先级 + 一对括号（相邻）
- * tokens: a o1 b o2 c o3 d，括号只可能包住 (a o1 b)/(b o2 c)/(c o3 d)
- */
-private fun evalExact(nums: List<Int>, ops: List<Op>, paren: ParenMode): Frac? {
-    val tokens = buildTokens(nums, ops, paren)
-
-    fun apply(x: Frac, op: Op, y: Frac): Frac? = when (op) {
-        Op.ADD -> x + y
-        Op.SUB -> x - y
-        Op.MUL -> x * y
-        Op.DIV -> x.div(y)
-    }
-
-    val vals = ArrayDeque<Frac>()
-    val opsStack = ArrayDeque<Any>() // Op or Tok.L marker
-
-    fun popApply(): Boolean {
-        val top = opsStack.removeLastOrNull() ?: return false
-        val op = top as? Op ?: return false
-        val right = vals.removeLastOrNull() ?: return false
-        val left = vals.removeLastOrNull() ?: return false
-        val r = apply(left, op, right) ?: return false
-        vals.addLast(r)
-        return true
-    }
-
-    for (t in tokens) {
-        when (t) {
-            is Tok.Num -> vals.addLast(t.v)
-            is Tok.Oper -> {
-                val cur = t.op
-                while (true) {
-                    val top = opsStack.lastOrNull()
-                    val topOp = top as? Op
-                    if (topOp != null && precedence(topOp) >= precedence(cur)) {
-                        if (!popApply()) return null
-                    } else break
-                }
-                opsStack.addLast(cur)
-            }
-            Tok.L -> opsStack.addLast(Tok.L)
-            Tok.R -> {
-                while (true) {
-                    val top = opsStack.lastOrNull()
-                    if (top == Tok.L) {
-                        opsStack.removeLast()
-                        break
-                    }
-                    if (top !is Op) return null
-                    if (!popApply()) return null
-                }
-            }
-        }
-    }
-    while (opsStack.isNotEmpty()) {
-        val top = opsStack.lastOrNull()
-        if (top == Tok.L) return null
-        if (!popApply()) return null
-    }
-    return vals.lastOrNull()
-}
-
-private fun findAnySolution(nums: List<Int>, paren: ParenMode): String? {
-    val ops = Op.values()
-    for (o1 in ops) {
-        for (o2 in ops) {
-            for (o3 in ops) {
-                val chosen = listOf(o1, o2, o3)
-                val result = evalExact(nums, chosen, paren)
-                if (result == Frac(24, 1)) {
-                    return formatExpr(nums, chosen, paren)
-                }
-            }
-        }
-    }
-    return null
-}
-
-private fun findAnySolutionAllParen(nums: List<Int>): String? {
-    for (paren in ParenMode.values()) {
-        val solution = findAnySolution(nums, paren)
-        if (solution != null) return solution
-    }
-    return null
-}
-
-private fun formatExpr(nums: List<Int>, ops: List<Op>, paren: ParenMode): String {
-    val a = nums[0].toString()
-    val b = nums[1].toString()
-    val c = nums[2].toString()
-    val d = nums[3].toString()
-    val o1 = ops[0].label
-    val o2 = ops[1].label
-    val o3 = ops[2].label
-
-    return when (paren) {
-        ParenMode.NONE -> "$a $o1 $b $o2 $c $o3 $d = 24"
-        ParenMode.AB -> "($a $o1 $b) $o2 $c $o3 $d = 24"
-        ParenMode.BC -> "$a $o1 ($b $o2 $c) $o3 $d = 24"
-        ParenMode.CD -> "$a $o1 $b $o2 ($c $o3 $d) = 24"
-    }
-}
-
-private fun random4(): List<Int> = (1..9).shuffled().take(4)
 
 private fun Float.roundToIntClamped(min: Int, max: Int): Int {
     val r = round(this).toInt()

@@ -1,4 +1,6 @@
-package com.example.game24
+<<<<<<< Current (Your changes)
+=======
+package com.spx.game24
 
 import org.junit.Test
 
@@ -15,3 +17,4 @@ class ExampleUnitTest {
         assertEquals(4, 2 + 2)
     }
 }
+>>>>>>> Incoming (Background Agent changes)
