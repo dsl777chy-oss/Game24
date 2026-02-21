@@ -136,7 +136,7 @@ fun evalExact(nums: List<Int>, ops: List<Op>, paren: ParenMode): Frac? {
 }
 
 private fun findAnySolution(nums: List<Int>, paren: ParenMode): String? {
-    val ops = Op.values()
+    val ops = Op.entries
     for (o1 in ops) {
         for (o2 in ops) {
             for (o3 in ops) {
@@ -152,7 +152,7 @@ private fun findAnySolution(nums: List<Int>, paren: ParenMode): String? {
 }
 
 fun findAnySolutionAllParen(nums: List<Int>): String? {
-    for (paren in ParenMode.values()) {
+    for (paren in ParenMode.entries) {
         val solution = findAnySolution(nums, paren)
         if (solution != null) return solution
     }

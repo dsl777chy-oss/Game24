@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -60,7 +61,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.spx.game24.domain.Frac
 import com.spx.game24.domain.Op
 import com.spx.game24.domain.ParenMode
 import com.spx.game24.ui.theme.Game24Theme
@@ -406,14 +406,12 @@ private fun ExpressionPanel(
         var spacing: Dp = maxSpacing
         var slotW: Dp = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
             .coerceIn(minSlotW, maxSlotW)
-        var total: Dp = totalWidth(slotW, spacing)
-        if (total > available) {
+        if (totalWidth(slotW, spacing) > available) {
             spacing = minSpacing
             slotW = ((available - (spacing * 6 + bracketW * 2 + bracketPadding * 2)) / 7f)
                 .coerceIn(minSlotW, maxSlotW)
-            total = totalWidth(slotW, spacing)
         }
-        if (total > available) slotW = minSlotW
+        if (totalWidth(slotW, spacing) > available) slotW = minSlotW
         val slotH = (slotW * 1.15f).coerceIn(44.dp, 58.dp)
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -424,12 +422,12 @@ private fun ExpressionPanel(
             ) {
                 when (paren) {
                     ParenMode.AB -> {
-                        BracketGroup(highlight = true, spacing = spacing, padding = bracketPadding) {
-                            BracketSymbol(show = true, symbol = "(", width = bracketW)
+                        BracketGroup(spacing = spacing, padding = bracketPadding) {
+                            BracketSymbol(symbol = "(", width = bracketW)
                             SlotNumber(value = slots[0], width = slotW, height = slotH, onClick = { onSlotClick(0) })
                             SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
                             SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
-                            BracketSymbol(show = true, symbol = ")", width = bracketW)
+                            BracketSymbol(symbol = ")", width = bracketW)
                         }
                         SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
                         SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
@@ -439,12 +437,12 @@ private fun ExpressionPanel(
                     ParenMode.BC -> {
                         SlotNumber(value = slots[0], width = slotW, height = slotH, onClick = { onSlotClick(0) })
                         SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
-                        BracketGroup(highlight = true, spacing = spacing, padding = bracketPadding) {
-                            BracketSymbol(show = true, symbol = "(", width = bracketW)
+                        BracketGroup(spacing = spacing, padding = bracketPadding) {
+                            BracketSymbol(symbol = "(", width = bracketW)
                             SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
                             SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
                             SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
-                            BracketSymbol(show = true, symbol = ")", width = bracketW)
+                            BracketSymbol(symbol = ")", width = bracketW)
                         }
                         SlotOp(ops[2], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(2, it) })
                         SlotNumber(value = slots[3], width = slotW, height = slotH, onClick = { onSlotClick(3) })
@@ -454,12 +452,12 @@ private fun ExpressionPanel(
                         SlotOp(ops[0], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(0, it) })
                         SlotNumber(value = slots[1], width = slotW, height = slotH, onClick = { onSlotClick(1) })
                         SlotOp(ops[1], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(1, it) })
-                        BracketGroup(highlight = true, spacing = spacing, padding = bracketPadding) {
-                            BracketSymbol(show = true, symbol = "(", width = bracketW)
+                        BracketGroup(spacing = spacing, padding = bracketPadding) {
+                            BracketSymbol(symbol = "(", width = bracketW)
                             SlotNumber(value = slots[2], width = slotW, height = slotH, onClick = { onSlotClick(2) })
                             SlotOp(ops[2], width = slotW, height = slotH, enabled = !locked, onPick = { onPickOp(2, it) })
                             SlotNumber(value = slots[3], width = slotW, height = slotH, onClick = { onSlotClick(3) })
-                            BracketSymbol(show = true, symbol = ")", width = bracketW)
+                            BracketSymbol(symbol = ")", width = bracketW)
                         }
                     }
                     ParenMode.NONE -> {
@@ -491,27 +489,25 @@ private fun ExpressionPanel(
 }
 
 @Composable
-private fun BracketSymbol(show: Boolean, symbol: String, width: Dp) {
+private fun BracketSymbol(symbol: String, width: Dp) {
     Box(
         modifier = Modifier.width(width),
         contentAlignment = Alignment.Center
     ) {
-        if (show) Text(symbol, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(symbol, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 private fun BracketGroup(
-    highlight: Boolean,
     spacing: Dp,
     padding: Dp,
     content: @Composable RowScope.() -> Unit
 ) {
-    val bg = if (highlight) ArcadeAccent.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surface
     Row(
         modifier = Modifier
-            .background(bg, RoundedCornerShape(14.dp))
-            .border(1.dp, ArcadeAccent.copy(alpha = if (highlight) 0.32f else 0.12f), RoundedCornerShape(14.dp))
+            .background(ArcadeAccent.copy(alpha = 0.14f), RoundedCornerShape(14.dp))
+            .border(1.dp, ArcadeAccent.copy(alpha = 0.32f), RoundedCornerShape(14.dp))
             .padding(horizontal = padding, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(spacing),
         verticalAlignment = Alignment.CenterVertically,
@@ -594,7 +590,7 @@ private fun SlotOp(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Op.values().forEach { op ->
+                    Op.entries.forEach { op ->
                         Button(
                             onClick = { showDialog = false; onPick(op) },
                             modifier = Modifier.weight(1f),
@@ -625,7 +621,7 @@ private fun ParenSlider(value: ParenMode, enabled: Boolean, onChange: (ParenMode
             ParenMode.BC -> 2f
             ParenMode.CD -> 3f
         }
-        var temp by remember { mutableStateOf(raw) }
+        var temp by remember { mutableFloatStateOf(raw) }
         LaunchedEffect(value) {
             temp = raw
         }
@@ -659,7 +655,7 @@ private fun ParenSlider(value: ParenMode, enabled: Boolean, onChange: (ParenMode
                 steps = 2,
                 enabled = enabled,
                 onValueChangeFinished = {
-                    val snapped = temp.roundToIntClamped(0, 3)
+                    val snapped = temp.roundToParenIndex()
                     onChange(
                         when (snapped) {
                             0 -> ParenMode.NONE
@@ -744,7 +740,6 @@ private fun GradientActionButton(onClick: () -> Unit, enabled: Boolean, modifier
     }
 }
 
-private fun Float.roundToIntClamped(min: Int, max: Int): Int {
-    val r = round(this).toInt()
-    return r.coerceIn(min, max)
+private fun Float.roundToParenIndex(): Int {
+    return round(this).toInt().coerceIn(0, 3)
 }
